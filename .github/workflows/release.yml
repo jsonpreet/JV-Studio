@@ -1,135 +1,117 @@
-name: Release desktop apps
+name: Release JV Studio Free
 
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
 
 permissions:
   contents: write
 
 jobs:
   verify:
-    name: Verify v${{ github.ref_name }}
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: lts/*
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Check synchronized version
-        run: npm run check:version
-
-      - name: Check release tag
-        if: github.event_name == 'push'
+      - run: npm ci
+      - run: npm run check:version
+      - run: npm test
+      - id: version
         shell: bash
         run: |
           APP_VERSION="$(node -p "require('./package.json').version")"
-          test "${GITHUB_REF_NAME}" = "v${APP_VERSION}"
+          echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "push" ]; then test "${GITHUB_REF_NAME}" = "v${APP_VERSION}"; fi
 
-      - name: Run frontend tests
-        run: npm test
-
-      - name: Build frontend
-        run: npm run build
-
-  publish:
-    name: Build ${{ matrix.label }}
+  build:
     needs: verify
-    runs-on: ${{ matrix.platform }}
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - label: macOS Apple Silicon
-            platform: macos-latest
+            runner: macos-14
             rust-target: aarch64-apple-darwin
-            args: --target aarch64-apple-darwin --bundles app,dmg
-            apple-signing-identity: "-"
+            bundle-args: --target aarch64-apple-darwin --bundles app,dmg
+            asset-name: macos-aarch64
           - label: Windows x64
-            platform: windows-latest
+            runner: windows-latest
             rust-target: x86_64-pc-windows-msvc
-            args: --target x86_64-pc-windows-msvc --bundles nsis
-            apple-signing-identity: ""
-
+            bundle-args: --target x86_64-pc-windows-msvc --bundles nsis
+            asset-name: windows-x64
     steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: lts/*
           cache: npm
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-target }}
-
-      - name: Cache Rust build
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Bundle v0.6.4 removal engine (macOS)
+      - run: npm ci
+      - name: Bundle removal engine (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          curl -fL --retry 3 \
-            "https://github.com/allenk/VeoWatermarkRemover/releases/download/v0.6.4-demo/GeminiWatermarkTool-macOS-Universal-Video.zip" \
-            -o removal-engine.zip
-          echo "b97c3c3d27c6c7e4e672e16b772a4e21ae4a93d4d15fcd6a6129ec441def4d5e  removal-engine.zip" \
-            | shasum -a 256 -c -
+          curl -fL --retry 3 "https://github.com/allenk/VeoWatermarkRemover/releases/download/v0.6.4-demo/GeminiWatermarkTool-macOS-Universal-Video.zip" -o removal-engine.zip
+          echo "b97c3c3d27c6c7e4e672e16b772a4e21ae4a93d4d15fcd6a6129ec441def4d5e  removal-engine.zip" | shasum -a 256 -c -
           unzip -j removal-engine.zip GeminiWatermarkTool-Video -d bin
           chmod 755 bin/GeminiWatermarkTool-Video
-          codesign --force --sign - bin/GeminiWatermarkTool-Video
-
-      - name: Bundle v0.6.4 removal engine (Windows)
+      - name: Bundle removal engine (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $url = "https://github.com/allenk/VeoWatermarkRemover/releases/download/v0.6.4-demo/GeminiWatermarkTool-Windows-x64-Video.zip"
-          Invoke-WebRequest -Uri $url -OutFile removal-engine.zip
+          Invoke-WebRequest -Uri "https://github.com/allenk/VeoWatermarkRemover/releases/download/v0.6.4-demo/GeminiWatermarkTool-Windows-x64-Video.zip" -OutFile removal-engine.zip
           $expected = "e6a0fd8e1c6cbe26da02dafd8a1df4645ac35a565acab58e3171995dde4ab955"
-          $actual = (Get-FileHash removal-engine.zip -Algorithm SHA256).Hash.ToLower()
-          if ($actual -ne $expected) {
-            throw "Removal engine checksum mismatch: $actual"
-          }
+          if ((Get-FileHash removal-engine.zip -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw "Removal engine checksum mismatch" }
           Expand-Archive removal-engine.zip -DestinationPath removal-engine
           New-Item -ItemType Directory -Force -Path bin | Out-Null
           Copy-Item removal-engine/GeminiWatermarkTool-Video.exe bin/GeminiWatermarkTool-Video.exe
-
-      - name: Build and publish release
-        uses: tauri-apps/tauri-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.apple-signing-identity }}
+      - name: Build app
+        run: npm run tauri -- build ${{ matrix.bundle-args }}
+      - name: Create macOS release files
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          ditto -c -k --sequesterRsrc --keepParent "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/JV Studio.app" "release-assets/JV-Studio-Free-macos-aarch64.zip"
+          cp src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg release-assets/
+      - name: Create Windows release files
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          Copy-Item src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe release-assets/
+          Compress-Archive -Path release-assets/*.exe -DestinationPath release-assets/JV-Studio-Free-windows-x64.zip
+      - uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: "JV Studio v__VERSION__"
-          releaseBody: |
-            JV Studio by Jsonpreet.
+          name: ${{ matrix.asset-name }}
+          path: release-assets/*
+          if-no-files-found: error
 
-            Free edition: local batch watermark removal. Custom Watermark and
-            FFmpeg Upscale are reserved for the separate JV Studio Pro edition.
-
-            Download the installer for your platform from the assets below.
-            Includes GeminiWatermarkTool-Video v0.6.4 by Allen Kuo (allenk),
-            distributed under the upstream MIT terms with attribution.
-            These community builds are not code-signed or notarized.
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }}
+  release:
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'push' && github.ref_name || format('v{0}', needs.verify.outputs.version) }}
+          target_commitish: ${{ github.sha }}
+          name: JV Studio Free v${{ needs.verify.outputs.version }}
+          generate_release_notes: true
+          files: release-assets/*
