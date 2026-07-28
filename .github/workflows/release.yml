@@ -41,7 +41,7 @@ jobs:
           - label: macOS Apple Silicon
             runner: macos-14
             rust-target: aarch64-apple-darwin
-            bundle-args: --target aarch64-apple-darwin --bundles app,dmg
+            bundle-args: --target aarch64-apple-darwin --bundles app
             asset-name: macos-aarch64
           - label: Windows x64
             runner: windows-latest
@@ -86,8 +86,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          ditto -c -k --sequesterRsrc --keepParent "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/JV Studio.app" "release-assets/JV-Studio-Free-macos-aarch64.zip"
-          cp src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg release-assets/
+          APP="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/JV Studio.app"
+          codesign --force --deep --sign - --timestamp=none "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "release-assets/JV-Studio-Free-macos-aarch64.zip"
+          hdiutil create -volname "JV Studio Free" -srcfolder "$APP" -ov -format UDZO "release-assets/JV-Studio-Free-macos-aarch64.dmg"
       - name: Create Windows release files
         if: runner.os == 'Windows'
         shell: pwsh
