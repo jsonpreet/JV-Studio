@@ -1,0 +1,135 @@
+name: Release desktop apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Verify v${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check synchronized version
+        run: npm run check:version
+
+      - name: Check release tag
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          APP_VERSION="$(node -p "require('./package.json').version")"
+          test "${GITHUB_REF_NAME}" = "v${APP_VERSION}"
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+  publish:
+    name: Build ${{ matrix.label }}
+    needs: verify
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS Apple Silicon
+            platform: macos-latest
+            rust-target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin --bundles app,dmg
+            apple-signing-identity: "-"
+          - label: Windows x64
+            platform: windows-latest
+            rust-target: x86_64-pc-windows-msvc
+            args: --target x86_64-pc-windows-msvc --bundles nsis
+            apple-signing-identity: ""
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bundle v0.6.4 removal engine (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          curl -fL --retry 3 \
+            "https://github.com/allenk/VeoWatermarkRemover/releases/download/v0.6.4-demo/GeminiWatermarkTool-macOS-Universal-Video.zip" \
+            -o removal-engine.zip
+          echo "b97c3c3d27c6c7e4e672e16b772a4e21ae4a93d4d15fcd6a6129ec441def4d5e  removal-engine.zip" \
+            | shasum -a 256 -c -
+          unzip -j removal-engine.zip GeminiWatermarkTool-Video -d bin
+          chmod 755 bin/GeminiWatermarkTool-Video
+          codesign --force --sign - bin/GeminiWatermarkTool-Video
+
+      - name: Bundle v0.6.4 removal engine (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/allenk/VeoWatermarkRemover/releases/download/v0.6.4-demo/GeminiWatermarkTool-Windows-x64-Video.zip"
+          Invoke-WebRequest -Uri $url -OutFile removal-engine.zip
+          $expected = "e6a0fd8e1c6cbe26da02dafd8a1df4645ac35a565acab58e3171995dde4ab955"
+          $actual = (Get-FileHash removal-engine.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $expected) {
+            throw "Removal engine checksum mismatch: $actual"
+          }
+          Expand-Archive removal-engine.zip -DestinationPath removal-engine
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          Copy-Item removal-engine/GeminiWatermarkTool-Video.exe bin/GeminiWatermarkTool-Video.exe
+
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.apple-signing-identity }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "JV Studio v__VERSION__"
+          releaseBody: |
+            JV Studio by Jsonpreet.
+
+            Free edition: local batch watermark removal. Custom Watermark and
+            FFmpeg Upscale are reserved for the separate JV Studio Pro edition.
+
+            Download the installer for your platform from the assets below.
+            Includes GeminiWatermarkTool-Video v0.6.4 by Allen Kuo (allenk),
+            distributed under the upstream MIT terms with attribution.
+            These community builds are not code-signed or notarized.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
