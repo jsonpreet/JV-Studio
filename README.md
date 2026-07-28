@@ -6,6 +6,10 @@ A small cross-platform desktop application with a bundled
 `GeminiWatermarkTool-Video` engine, published by `allenk/VeoWatermarkRemover`.
 Users do not need to download or locate a separate CLI.
 
+**JV Studio is a Gemini Watermark Removal Tool for Videos**: a local desktop
+app for batch-processing supported Omini and Veo video clips with the upstream
+video engine. JV Studio is independent and is not affiliated with Google.
+
 **Author:** Jsonpreet  
 **Version:** 0.3.0
 
