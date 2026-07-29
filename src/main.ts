@@ -203,7 +203,17 @@ function render(followLogs = false): void {
   const progressLabel = `${Math.round(overallProgress * 100)}%`;
   byId("summary").textContent = running ? `${done} of ${jobs.length} · ${progressLabel}` : `${done} of ${jobs.length}`;
   byId<HTMLProgressElement>("progress").value = overallProgress;
-  byId("status").textContent = running ? `Processing videos · ${progressLabel}` : jobs.length ? `${jobs.length} video${jobs.length === 1 ? "" : "s"} ready` : "Add videos to begin";
+  const pending = jobs.filter((job) => job.state === "pending").length;
+  const succeeded = jobs.filter((job) => job.state === "succeeded").length;
+  byId("status").textContent = running
+    ? `Processing videos · ${progressLabel}`
+    : pending
+      ? `${pending} video${pending === 1 ? "" : "s"} ready`
+      : succeeded
+        ? `${succeeded} video${succeeded === 1 ? "" : "s"} completed`
+        : jobs.length
+          ? "Processing finished"
+          : "Add videos to begin";
   byId("log-count").textContent = String(logs.length);
   byId("logs-tab").classList.toggle("hidden", !showProcessingLogs);
   if (!showProcessingLogs && removeTab === "logs") removeTab = "queue";
