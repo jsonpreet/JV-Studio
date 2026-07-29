@@ -1246,6 +1246,11 @@ button:disabled {
   min-height: 0;
 }
 
+.free-app .queue-section {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .free-app .activity-log {
   flex: 1;
   overflow-y: auto;
@@ -1276,8 +1281,12 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   align-content: start;
+  width: 100%;
+  min-width: 0;
   gap: 14px;
   padding: 16px 20px 20px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .free-app .drop-zone {

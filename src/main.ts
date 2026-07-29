@@ -47,9 +47,13 @@ app.innerHTML = `
   </main>
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><section class="info-dialog"><header class="info-header"><div><span id="modal-kicker" class="eyebrow">JV Studio</span><h2 id="modal-title"></h2><p id="modal-copy"></p></div><button id="close-modal" class="icon-button">×</button></header><div id="modal-body" class="info-content"></div><footer class="info-footer"><button id="modal-done" class="button primary">Done</button></footer></section></div>`;
 
-const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const byId = <T extends HTMLElement>(id: string) => {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`Missing required element: #${id}`);
+  return element as T;
+};
 const queue = byId<HTMLDivElement>("queue");
-const activity = byId<HTMLDivElement>("activity");
+const activity = byId<HTMLDivElement>("logs-panel");
 const stripTerminalControl = (text: string) => text.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\r/g, "\n").trim();
 const log = (line: string) => { logs = [...logs.slice(-199), line]; render(true); };
 const name = (path: string) => path.split(/[\\/]/).pop() || path;
@@ -62,6 +66,23 @@ const videoSource = (path: string) => {
     return "";
   }
 };
+
+function attachVideoPreviews(): void {
+  const previews = queue.querySelectorAll<HTMLElement>(".video-card-preview");
+  previews.forEach((preview, index) => {
+    const job = jobs[index];
+    if (!job) return;
+    const source = videoSource(job.inputPath);
+    if (!source) return;
+    const video = document.createElement("video");
+    video.className = "video-thumbnail";
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+    video.src = source;
+    preview.prepend(video);
+  });
+}
 
 function showModal(title: string, copy: string, body = ""): void {
   byId("modal-title").textContent = title;
@@ -89,15 +110,15 @@ function render(followLogs = false): void {
     const progress = Math.round(job.progress * 100);
     const isRunning = job.state === "running";
     const stateLabel = isRunning ? "Removing watermark" : job.state === "succeeded" ? "Completed" : job.state === "failed" ? "Failed" : job.state === "cancelled" ? "Cancelled" : "Ready";
-    const source = videoSource(job.inputPath);
     return `<article class="video-card ${job.state}">
       <div class="video-card-preview">
-        <span class="video-fallback">▶</span>${source ? `<video class="video-thumbnail" src="${escapeHtml(source)}" muted playsinline preload="metadata"></video>` : ""}
+        <span class="video-fallback">▶</span>
         ${isRunning ? `<div class="video-processing-overlay"><div class="circular-progress" style="--progress: ${progress * 3.6}deg"><span>${progress}%</span></div><strong>Removing</strong></div>` : `<span class="video-state-badge ${job.state}">${stateLabel}</span>`}
       </div>
       <div class="video-card-copy"><strong title="${escapeHtml(name(job.inputPath))}">${escapeHtml(name(job.inputPath))}</strong><span>${escapeHtml(job.detail || stateLabel)}</span></div>
     </article>`;
   }).join("") : `<button id="drop-add" class="drop-zone"><strong>Drop multiple MP4 clips here</strong><span>or choose Add videos</span></button>`;
+  if (jobs.length) window.requestAnimationFrame(attachVideoPreviews);
   activity.innerHTML = logs.map((line) => `<div class="log-line"><code>${escapeHtml(line)}</code></div>`).join("") || `<div class="empty-log">Processing updates will appear here.</div>`;
   if (followLogs) activity.scrollTop = activity.scrollHeight;
   byId("start").toggleAttribute("disabled", running || !jobs.some((job) => job.state === "pending") || !cliPath || !outputFolder);
