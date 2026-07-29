@@ -11,7 +11,7 @@ app for batch-processing supported Omini and Veo video clips with the upstream
 video engine. JV Studio is independent and is not affiliated with Google.
 
 **Author:** Jsonpreet  
-**Version:** 0.3.4
+**Version:** 0.3.9
 
 ## Editions
 
@@ -166,9 +166,8 @@ npm install
 npm run tauri:build
 ```
 
-Tauri produces a macOS `.app`/`.dmg` on macOS and an `.msi`/NSIS setup
-executable on Windows. Native installer generation is most reliable on the
-target operating system.
+Tauri produces a macOS `.app` and an `.msi`/NSIS setup executable on Windows.
+Native installer generation is most reliable on the target operating system.
 
 ## GitHub Releases
 
@@ -177,12 +176,17 @@ The included `.github/workflows/release.yml` workflow builds:
 - macOS Apple Silicon `.app` ZIP bundle;
 - Windows x64 NSIS installer.
 
-To publish version `0.3.4`, push the project to GitHub and create its matching
+macOS users install from the ZIP: unzip it, drag `JV Studio.app` to the
+Applications folder, then open it. The app inside the archive is Developer ID
+signed and notarized; the ZIP format avoids unreliable temporary-space limits
+on hosted macOS build runners.
+
+To publish version `0.3.9`, push the project to GitHub and create its matching
 version tag:
 
 ```bash
-git tag v0.3.4
-git push origin v0.3.4
+git tag v0.3.9
+git push origin v0.3.9
 ```
 
 GitHub Actions verifies that `package.json`, `Cargo.toml`, and
