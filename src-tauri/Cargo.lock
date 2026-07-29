@@ -1834,7 +1834,7 @@ dependencies = [
 
 [[package]]
 name = "jv-studio"
-version = "0.3.12"
+version = "0.3.13"
 dependencies = [
  "serde",
  "tauri",

@@ -23,8 +23,11 @@ let running = false;
 const history = JSON.parse(localStorage.getItem("freeHistory") ?? "[]") as Array<{ inputPath: string; outputPath?: string; at: number }>;
 const APP_VERSION = `v${appPackage.version}`;
 const APP_REPOSITORY = "https://github.com/jsonpreet/JV-Studio";
+const AUTHOR_X_PROFILE = "https://x.com/jsonpreet";
 const UPSTREAM_REPOSITORY = "https://github.com/allenk/GeminiWatermarkTool";
 const LATEST_RELEASE_API = "https://api.github.com/repos/jsonpreet/JV-Studio/releases/latest";
+const GITHUB_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .7A11.3 11.3 0 0 0 8.4 22.8c.6.1.8-.2.8-.6v-2.2c-3.4.7-4.1-1.4-4.1-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.8.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6A4.7 4.7 0 0 1 5.8 8.4c-.1-.3-.5-1.6.1-3.3 0 0 1-.3 3.4 1.3a11.8 11.8 0 0 1 6.2 0C17.9 4.8 19 5.1 19 5.1c.6 1.7.2 3 .1 3.3a4.7 4.7 0 0 1 1.3 3.3c0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.3 11.3 0 0 0 12 .7Z"/></svg>`;
+const X_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2.3h3.7l-8.1 9.3L24 21.7h-7.4l-5.8-7.6-6.7 7.6H.4l8.7-9.9L0 2.3h7.6l5.2 6.9 6.1-6.9Zm-1.3 17.6h2L6.5 4H4.4l13.2 15.9Z"/></svg>`;
 
 app.innerHTML = `
   <main class="app-layout free-app">
@@ -36,10 +39,10 @@ app.innerHTML = `
         <button class="tool-nav-item" data-pro="Upscale"><span class="nav-icon">↗</span><span>Upscale</span></button>
         <button class="tool-nav-item" data-page="library"><span class="nav-icon">▦</span><span>Library</span></button>
       </nav>
-      <div class="sidebar-footer"><div id="system" class="system-badge">Checking system…</div><button id="settings" class="tool-nav-item compact"><span class="nav-icon">⚙</span><span>Settings</span></button></div>
+      <div class="sidebar-footer"><div class="sidebar-social-links" aria-label="Jsonpreet links"><button id="sidebar-github" class="sidebar-social-link" title="JV Studio on GitHub">${GITHUB_ICON}<span>GitHub</span></button><button id="sidebar-x" class="sidebar-social-link" title="Jsonpreet on X">${X_ICON}<span>jsonpreet</span></button></div><div id="system" class="system-badge">Checking system…</div><button id="settings" class="tool-nav-item compact"><span class="nav-icon">⚙</span><span>Settings</span></button></div>
     </aside>
     <section class="shell">
-      <header class="app-header"><div class="header-copy"><div class="title-row"><h1>JV Studio</h1><button id="about" class="about-link">About</button></div><p>Remove visible video watermarks locally.</p><div class="app-credit"><span>Free edition · By Jsonpreet</span><span>${APP_VERSION}</span></div></div><button id="add-videos" class="button secondary">Add videos</button></header>
+      <header class="app-header"><div class="header-copy"><div class="title-row"><h1>JV Studio</h1><button id="about" class="about-link">About</button></div><p>Remove visible video watermarks locally.</p><div class="app-credit"><span>Free edition</span><button id="author-link" class="author-link" title="x.com/jsonpreet">By Jsonpreet ${X_ICON}</button><span>${APP_VERSION}</span></div></div><button id="add-videos" class="button secondary">Add videos</button></header>
       <section id="remove-page">
         <section class="workspace-bar"><div class="workspace-copy"><span class="eyebrow">Watermark removal</span><h2>Remove watermarks</h2><p>Add Omini or Veo clips and process them one at a time. Originals are never changed.</p></div><button id="choose-output" class="output-card"><span class="eyebrow">Output folder</span><strong id="output">Choose a folder</strong><span class="chevron">›</span></button></section>
         <section class="free-engine"><div><strong id="engine-title">Removal engine</strong><span id="engine-detail">Checking bundled engine…</span></div></section>
@@ -111,9 +114,14 @@ function showAbout(): void {
     "About JV Studio",
     `Free, local video watermark removal by Jsonpreet. ${APP_VERSION}`,
     `<p>JV Studio processes supported video clips locally and preserves the original files.</p>
-      <div class="credit-card"><span class="eyebrow">Open source attribution</span><strong>GeminiWatermarkTool</strong><p>Uses GeminiWatermarkTool and GeminiWatermarkTool-Video by Allen Kuo (allenk) under the upstream MIT terms.</p><button id="about-repository" class="button secondary">JV Studio repository</button><button id="about-upstream" class="button secondary">Upstream repository</button></div>`,
+      <div class="creator-links">
+        <button id="about-repository" class="creator-link">${GITHUB_ICON}<span><strong>jsonpreet/JV-Studio</strong><small>GitHub repository</small></span><b>Open</b></button>
+        <button id="about-x" class="creator-link">${X_ICON}<span><strong>x.com/jsonpreet</strong><small>Follow Jsonpreet on X</small></span><b>Open</b></button>
+      </div>
+      <div class="credit-card"><span class="eyebrow">Open source attribution</span><strong>GeminiWatermarkTool</strong><p>Uses GeminiWatermarkTool and GeminiWatermarkTool-Video by Allen Kuo (allenk) under the upstream MIT terms.</p><button id="about-upstream" class="button secondary">Upstream repository</button></div>`,
   );
   byId("about-repository").addEventListener("click", () => void openUrl(APP_REPOSITORY));
+  byId("about-x").addEventListener("click", () => void openUrl(AUTHOR_X_PROFILE));
   byId("about-upstream").addEventListener("click", () => void openUrl(UPSTREAM_REPOSITORY));
 }
 
@@ -257,5 +265,5 @@ void listen<CliOutput>("cli-output", ({ payload }) => {
 void invoke<Capability>("system_capabilities").then((value) => { cliPath = value.bundledCliPath ?? ""; byId("system").textContent = `✓ ${value.gpuSummary}`; byId("engine-title").textContent = cliPath ? "Removal engine ready" : "Removal engine unavailable"; byId("engine-detail").textContent = cliPath ? "Bundled video engine is ready." : "The bundled video engine is unavailable in this installation."; render(); });
 byId("add-videos").addEventListener("click", () => void addVideos()); byId("choose-output").addEventListener("click", () => void chooseOutput()); byId("start").addEventListener("click", () => void start()); byId("cancel").addEventListener("click", () => { running = false; void invoke("cancel_processing"); }); byId("clear").addEventListener("click", () => { if (!running) { jobs = []; render(); } }); byId("queue-tab").addEventListener("click", () => { removeTab = "queue"; render(); }); byId("logs-tab").addEventListener("click", () => { removeTab = "logs"; render(true); }); queue.addEventListener("click", (event) => { if ((event.target as HTMLElement).closest("#drop-add")) void addVideos(); });
 document.querySelector(".tool-nav")?.addEventListener("click", (event) => { const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!button) return; if (button.dataset.pro) showModal(`${button.dataset.pro} is available in Pro`, "This Free edition keeps the tool visible for discovery. Licensing and checkout will be added later.", "<div class=\"credit-card\"><strong>JV Studio Pro</strong><p>Unlock Custom Watermark and local FFmpeg Upscale when Pro launches.</p></div>"); if (button.dataset.page) { page = button.dataset.page as "remove" | "library"; render(); } });
-byId("settings").addEventListener("click", showSettings); byId("about").addEventListener("click", showAbout); byId("close-modal").addEventListener("click", () => byId("modal").classList.add("hidden")); byId("modal-done").addEventListener("click", () => byId("modal").classList.add("hidden"));
+byId("settings").addEventListener("click", showSettings); byId("about").addEventListener("click", showAbout); byId("author-link").addEventListener("click", () => void openUrl(AUTHOR_X_PROFILE)); byId("sidebar-github").addEventListener("click", () => void openUrl(APP_REPOSITORY)); byId("sidebar-x").addEventListener("click", () => void openUrl(AUTHOR_X_PROFILE)); byId("close-modal").addEventListener("click", () => byId("modal").classList.add("hidden")); byId("modal-done").addEventListener("click", () => byId("modal").classList.add("hidden"));
 render();

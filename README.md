@@ -10,8 +10,11 @@ Users do not need to download or locate a separate CLI.
 app for batch-processing supported Omini and Veo video clips with the upstream
 video engine. JV Studio is independent and is not affiliated with Google.
 
-**Author:** Jsonpreet  
-**Version:** 0.3.12
+**Author:** [Jsonpreet](https://x.com/jsonpreet)
+
+**Repository:** [jsonpreet/JV-Studio](https://github.com/jsonpreet/JV-Studio)
+
+**Version:** 0.3.13
 
 ## Editions
 
@@ -181,12 +184,12 @@ Applications folder, then open it. The app inside the archive is Developer ID
 signed and notarized; the ZIP format avoids unreliable temporary-space limits
 on hosted macOS build runners.
 
-To publish version `0.3.12`, push the project to GitHub and create its matching
+To publish version `0.3.13`, push the project to GitHub and create its matching
 version tag:
 
 ```bash
-git tag v0.3.12
-git push origin v0.3.12
+git tag v0.3.13
+git push origin v0.3.13
 ```
 
 GitHub Actions verifies that `package.json`, `Cargo.toml`, and
