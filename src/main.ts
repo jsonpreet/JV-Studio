@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import appPackage from "../package.json";
@@ -16,6 +16,8 @@ let logs: string[] = [];
 let cliPath = "";
 let outputFolder = localStorage.getItem("freeOutputFolder") ?? "";
 let page: "remove" | "library" = "remove";
+let removeTab: "queue" | "logs" = "queue";
+let showProcessingLogs = localStorage.getItem("freeShowProcessingLogs") === "true";
 let running = false;
 const history = JSON.parse(localStorage.getItem("freeHistory") ?? "[]") as Array<{ inputPath: string; outputPath?: string; at: number }>;
 const APP_VERSION = `v${appPackage.version}`;
@@ -37,8 +39,7 @@ app.innerHTML = `
       <section id="remove-page">
         <section class="workspace-bar"><div class="workspace-copy"><span class="eyebrow">Watermark removal</span><h2>Remove watermarks</h2><p>Add Omini or Veo clips and process them one at a time. Originals are never changed.</p></div><button id="choose-output" class="output-card"><span class="eyebrow">Output folder</span><strong id="output">Choose a folder</strong><span class="chevron">›</span></button></section>
         <section class="free-engine"><div><strong id="engine-title">Removal engine</strong><span id="engine-detail">Checking bundled engine…</span></div></section>
-        <section class="queue-section"><div class="section-heading"><div><h2>Queue</h2><span id="count">0 files</span></div><button id="clear" class="text-button">Clear all</button></div><div id="queue" class="queue"></div></section>
-        <section class="activity-section"><div class="section-heading"><div><h2>Activity</h2><span id="log-count">0 messages</span></div></div><div id="activity" class="activity-log"></div></section>
+        <section class="queue-section"><div class="section-heading"><div><h2 id="queue-title">Queue</h2><span id="count">0 files</span></div><div class="queue-actions"><button id="queue-tab" class="text-button tab-button active">Videos</button><button id="logs-tab" class="text-button tab-button hidden">Logs <span id="log-count">0</span></button><button id="clear" class="text-button">Clear all</button></div></div><div id="queue" class="queue"></div><div id="logs-panel" class="activity-log hidden"></div></section>
         <footer class="footer"><div class="overall"><div><strong id="status">Add videos to begin</strong><span id="summary">0 of 0</span></div><progress id="progress" max="1" value="0"></progress></div><button id="cancel" class="button danger hidden">Cancel</button><button id="start" class="button primary">Start</button></footer>
       </section>
       <section id="library-page" class="library-page hidden"><header class="library-header"><div><span class="eyebrow">Local history</span><h2>Your video library</h2><p>Recent Free edition imports and completed outputs on this computer.</p></div></header><div id="history" class="history-list"></div></section>
@@ -52,6 +53,8 @@ const activity = byId<HTMLDivElement>("activity");
 const stripTerminalControl = (text: string) => text.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\r/g, "\n").trim();
 const log = (line: string) => { logs = [...logs.slice(-199), line]; render(true); };
 const name = (path: string) => path.split(/[\\/]/).pop() || path;
+const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
+const videoSource = (path: string) => `${convertFileSrc(path)}#t=0.1`;
 
 function showModal(title: string, copy: string, body = ""): void {
   byId("modal-title").textContent = title;
@@ -68,9 +71,26 @@ function render(followLogs = false): void {
   byId("summary").textContent = running ? `${done} of ${jobs.length} · ${progressLabel}` : `${done} of ${jobs.length}`;
   byId<HTMLProgressElement>("progress").value = overallProgress;
   byId("status").textContent = running ? `Processing videos · ${progressLabel}` : jobs.length ? `${jobs.length} video${jobs.length === 1 ? "" : "s"} ready` : "Add videos to begin";
-  byId("log-count").textContent = `${logs.length} message${logs.length === 1 ? "" : "s"}`;
-  queue.innerHTML = jobs.length ? jobs.map((job) => `<article class="queue-row"><div><strong>${name(job.inputPath)}</strong><span>${job.detail || job.state}</span>${job.state === "running" ? `<progress max="1" value="${job.progress}"></progress>` : ""}</div><span class="job-state ${job.state}">${job.state === "running" ? `${Math.round(job.progress * 100)}%` : job.state}</span></article>`).join("") : `<button id="drop-add" class="drop-zone"><strong>Drop multiple MP4 clips here</strong><span>or choose Add videos</span></button>`;
-  activity.innerHTML = logs.map((line) => `<div class="log-line"><code>${line}</code></div>`).join("") || `<div class="empty-log">Processing updates will appear here.</div>`;
+  byId("log-count").textContent = String(logs.length);
+  byId("logs-tab").classList.toggle("hidden", !showProcessingLogs);
+  if (!showProcessingLogs && removeTab === "logs") removeTab = "queue";
+  byId("queue-tab").classList.toggle("active", removeTab === "queue");
+  byId("logs-tab").classList.toggle("active", removeTab === "logs");
+  queue.classList.toggle("hidden", removeTab !== "queue");
+  activity.classList.toggle("hidden", removeTab !== "logs");
+  queue.innerHTML = jobs.length ? jobs.map((job) => {
+    const progress = Math.round(job.progress * 100);
+    const isRunning = job.state === "running";
+    const stateLabel = isRunning ? "Removing watermark" : job.state === "succeeded" ? "Completed" : job.state === "failed" ? "Failed" : job.state === "cancelled" ? "Cancelled" : "Ready";
+    return `<article class="video-card ${job.state}">
+      <div class="video-card-preview">
+        <span class="video-fallback">▶</span><video class="video-thumbnail" src="${escapeHtml(videoSource(job.inputPath))}" muted playsinline preload="metadata"></video>
+        ${isRunning ? `<div class="video-processing-overlay"><div class="circular-progress" style="--progress: ${progress * 3.6}deg"><span>${progress}%</span></div><strong>Removing</strong></div>` : `<span class="video-state-badge ${job.state}">${stateLabel}</span>`}
+      </div>
+      <div class="video-card-copy"><strong title="${escapeHtml(name(job.inputPath))}">${escapeHtml(name(job.inputPath))}</strong><span>${escapeHtml(job.detail || stateLabel)}</span></div>
+    </article>`;
+  }).join("") : `<button id="drop-add" class="drop-zone"><strong>Drop multiple MP4 clips here</strong><span>or choose Add videos</span></button>`;
+  activity.innerHTML = logs.map((line) => `<div class="log-line"><code>${escapeHtml(line)}</code></div>`).join("") || `<div class="empty-log">Processing updates will appear here.</div>`;
   if (followLogs) activity.scrollTop = activity.scrollHeight;
   byId("start").toggleAttribute("disabled", running || !jobs.some((job) => job.state === "pending") || !cliPath || !outputFolder);
   byId("cancel").classList.toggle("hidden", !running);
@@ -97,9 +117,16 @@ async function start(): Promise<void> {
       const outputPath = await invoke<string>("suggest_output_path", { inputPath: job.inputPath, outputFolder, reservedPaths: jobs.map((item) => item.outputPath).filter(Boolean) });
       const result = await invoke<{ exitCode: number; outputExists: boolean; cancelled: boolean }>("process_video", { request: { jobId: job.id, cliPath, inputPath: job.inputPath, outputPath, legacy: false, ml: false } });
       job.outputPath = outputPath;
-      job.state = result.cancelled ? "cancelled" : result.exitCode === 0 && result.outputExists ? "succeeded" : "failed";
-      job.progress = 1;
-      job.detail = job.state === "succeeded" ? "Completed" : job.state === "cancelled" ? "Cancelled" : "Could not process this video";
+      if (result.cancelled) {
+        job.state = "pending";
+        job.progress = 0;
+        job.detail = "Ready to retry";
+        log(`Cancelled ${name(job.inputPath)}. It is ready to retry.`);
+      } else {
+        job.state = result.exitCode === 0 && result.outputExists ? "succeeded" : "failed";
+        job.progress = 1;
+        job.detail = job.state === "succeeded" ? "Completed" : "Could not process this video";
+      }
       if (job.state === "succeeded") history.unshift({ inputPath: job.inputPath, outputPath, at: Date.now() });
     } catch (error) { job.state = "failed"; job.detail = String(error); log(`Error: ${String(error)}`); }
     localStorage.setItem("freeHistory", JSON.stringify(history.slice(0, 100))); render();
@@ -118,7 +145,7 @@ void listen<CliOutput>("cli-output", ({ payload }) => {
   if (text) log(`${payload.stream === "stderr" ? "• " : ""}${text}`);
 });
 void invoke<Capability>("system_capabilities").then((value) => { cliPath = value.bundledCliPath ?? ""; byId("system").textContent = `✓ ${value.gpuSummary}`; byId("engine-title").textContent = cliPath ? "Removal engine ready" : "Removal engine unavailable"; byId("engine-detail").textContent = cliPath ? "Bundled video engine is ready." : "The bundled video engine is unavailable in this installation."; render(); });
-byId("add-videos").addEventListener("click", () => void addVideos()); byId("choose-output").addEventListener("click", () => void chooseOutput()); byId("start").addEventListener("click", () => void start()); byId("cancel").addEventListener("click", () => { running = false; void invoke("cancel_processing"); }); byId("clear").addEventListener("click", () => { if (!running) { jobs = []; render(); } }); queue.addEventListener("click", (event) => { if ((event.target as HTMLElement).closest("#drop-add")) void addVideos(); });
+byId("add-videos").addEventListener("click", () => void addVideos()); byId("choose-output").addEventListener("click", () => void chooseOutput()); byId("start").addEventListener("click", () => void start()); byId("cancel").addEventListener("click", () => { running = false; void invoke("cancel_processing"); }); byId("clear").addEventListener("click", () => { if (!running) { jobs = []; render(); } }); byId("queue-tab").addEventListener("click", () => { removeTab = "queue"; render(); }); byId("logs-tab").addEventListener("click", () => { removeTab = "logs"; render(true); }); queue.addEventListener("click", (event) => { if ((event.target as HTMLElement).closest("#drop-add")) void addVideos(); });
 document.querySelector(".tool-nav")?.addEventListener("click", (event) => { const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!button) return; if (button.dataset.pro) showModal(`${button.dataset.pro} is available in Pro`, "This Free edition keeps the tool visible for discovery. Licensing and checkout will be added later.", "<div class=\"credit-card\"><strong>JV Studio Pro</strong><p>Unlock Custom Watermark and local FFmpeg Upscale when Pro launches.</p></div>"); if (button.dataset.page) { page = button.dataset.page as "remove" | "library"; render(); } });
-byId("settings").addEventListener("click", () => showModal("Settings", "Free edition settings", `<div class="credit-card"><strong>Removal engine</strong><p>${cliPath ? "Bundled video engine is installed and ready." : "Bundled video engine unavailable."}</p></div>`)); byId("about").addEventListener("click", () => showModal("About JV Studio", `Free, local video watermark removal by Jsonpreet. ${APP_VERSION}`, "<p>Uses GeminiWatermarkTool and GeminiWatermarkTool-Video by Allen Kuo (allenk) under the upstream MIT terms.</p>")); byId("close-modal").addEventListener("click", () => byId("modal").classList.add("hidden")); byId("modal-done").addEventListener("click", () => byId("modal").classList.add("hidden"));
+byId("settings").addEventListener("click", () => { showModal("Settings", "Free edition settings", `<div class="settings-group"><div><h3>Processing</h3><p>Choose how much detail appears while a video is running.</p></div><label class="settings-toggle"><span><b>Show processing logs</b><small>Add a Logs tab below Watermark Remove for live engine output.</small></span><input id="show-processing-logs" type="checkbox" ${showProcessingLogs ? "checked" : ""} /></label></div><div class="credit-card"><strong>Removal engine</strong><p>${cliPath ? "Bundled video engine is installed and ready." : "Bundled video engine unavailable."}</p></div>`); byId<HTMLInputElement>("show-processing-logs").addEventListener("change", (event) => { showProcessingLogs = (event.currentTarget as HTMLInputElement).checked; localStorage.setItem("freeShowProcessingLogs", String(showProcessingLogs)); if (!showProcessingLogs) removeTab = "queue"; render(); }); }); byId("about").addEventListener("click", () => showModal("About JV Studio", `Free, local video watermark removal by Jsonpreet. ${APP_VERSION}`, "<p>Uses GeminiWatermarkTool and GeminiWatermarkTool-Video by Allen Kuo (allenk) under the upstream MIT terms.</p>")); byId("close-modal").addEventListener("click", () => byId("modal").classList.add("hidden")); byId("modal-done").addEventListener("click", () => byId("modal").classList.add("hidden"));
 render();
