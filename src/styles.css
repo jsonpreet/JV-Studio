@@ -2816,22 +2816,22 @@ button.settings-row:disabled > span:last-child {
   button.settings-row:focus,
   button.settings-row:focus-visible,
   button.settings-row:active {
-    color: #1f293d;
+    color: #e8ecf4;
     outline: 0;
-    background: #f7f9fd;
-    box-shadow: inset 0 0 0 2px rgba(102, 134, 255, 0.48);
+    background: #2a3040;
+    box-shadow: inset 0 0 0 2px rgba(112, 145, 255, 0.72);
   }
 
   button.settings-row:focus small,
   button.settings-row:focus-visible small,
   button.settings-row:active small {
-    color: #69758a;
+    color: #aab4c7;
   }
 
   button.settings-row:focus > span:last-child,
   button.settings-row:focus-visible > span:last-child,
   button.settings-row:active > span:last-child {
-    color: #315fb8;
+    color: #8eafff;
   }
 
   .creator-link:hover {
