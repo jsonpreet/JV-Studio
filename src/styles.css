@@ -2357,6 +2357,10 @@ button:disabled {
   background: white;
 }
 
+.info-content .settings-group + .settings-group {
+  margin-top: 14px;
+}
+
 .settings-group > div:first-child {
   padding: 12px 13px;
   border-bottom: 1px solid #edf0f5;

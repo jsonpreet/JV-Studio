@@ -11,6 +11,12 @@
       "allow": [
         {
           "url": "https://github.com/allenk/GeminiWatermarkTool"
+        },
+        {
+          "url": "https://github.com/jsonpreet/JV-Studio"
+        },
+        {
+          "url": "https://github.com/jsonpreet/JV-Studio/**"
         }
       ]
     }

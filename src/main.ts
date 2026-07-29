@@ -1,6 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import appPackage from "../package.json";
 import "./styles.css";
 
@@ -21,6 +22,9 @@ let showProcessingLogs = localStorage.getItem("freeShowProcessingLogs") === "tru
 let running = false;
 const history = JSON.parse(localStorage.getItem("freeHistory") ?? "[]") as Array<{ inputPath: string; outputPath?: string; at: number }>;
 const APP_VERSION = `v${appPackage.version}`;
+const APP_REPOSITORY = "https://github.com/jsonpreet/JV-Studio";
+const UPSTREAM_REPOSITORY = "https://github.com/allenk/GeminiWatermarkTool";
+const LATEST_RELEASE_API = "https://api.github.com/repos/jsonpreet/JV-Studio/releases/latest";
 
 app.innerHTML = `
   <main class="app-layout free-app">
@@ -89,6 +93,83 @@ function showModal(title: string, copy: string, body = ""): void {
   byId("modal-copy").textContent = copy;
   byId("modal-body").innerHTML = body;
   byId("modal").classList.remove("hidden");
+}
+
+const versionParts = (version: string) => version.replace(/^v/i, "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+function isNewerVersion(latest: string, current: string): boolean {
+  const latestParts = versionParts(latest);
+  const currentParts = versionParts(current);
+  const length = Math.max(latestParts.length, currentParts.length);
+  for (let index = 0; index < length; index += 1) {
+    if ((latestParts[index] ?? 0) !== (currentParts[index] ?? 0)) return (latestParts[index] ?? 0) > (currentParts[index] ?? 0);
+  }
+  return false;
+}
+
+function showAbout(): void {
+  showModal(
+    "About JV Studio",
+    `Free, local video watermark removal by Jsonpreet. ${APP_VERSION}`,
+    `<p>JV Studio processes supported video clips locally and preserves the original files.</p>
+      <div class="credit-card"><span class="eyebrow">Open source attribution</span><strong>GeminiWatermarkTool</strong><p>Uses GeminiWatermarkTool and GeminiWatermarkTool-Video by Allen Kuo (allenk) under the upstream MIT terms.</p><button id="about-repository" class="button secondary">JV Studio repository</button><button id="about-upstream" class="button secondary">Upstream repository</button></div>`,
+  );
+  byId("about-repository").addEventListener("click", () => void openUrl(APP_REPOSITORY));
+  byId("about-upstream").addEventListener("click", () => void openUrl(UPSTREAM_REPOSITORY));
+}
+
+function showSettings(): void {
+  showModal(
+    "Settings",
+    "Free edition settings",
+    `<div class="settings-group"><div><h3>Processing</h3><p>Choose how much detail appears while a video is running.</p></div><label class="settings-toggle"><span><b>Show processing logs</b><small>Add a Logs tab below Watermark Remove for live engine output.</small></span><input id="show-processing-logs" type="checkbox" ${showProcessingLogs ? "checked" : ""} /></label></div>
+      <div class="settings-group"><div><h3>Application</h3><p>Version information, updates, and project details.</p></div>
+        <div class="settings-row static"><span><b>Current version</b><small>The installed JV Studio Free release.</small></span><span>${APP_VERSION}</span></div>
+        <button id="check-updates" class="settings-row"><span><b>Check for updates</b><small id="update-detail">Check the official GitHub Releases channel.</small></span><span id="update-action">Check now</span></button>
+        <button id="open-repository" class="settings-row"><span><b>GitHub repository</b><small>Source code, releases, issues, and documentation.</small></span><span>Open</span></button>
+        <button id="settings-about" class="settings-row"><span><b>About JV Studio</b><small>Author, attribution, and open-source information.</small></span><span>View</span></button>
+      </div>`,
+  );
+
+  byId<HTMLInputElement>("show-processing-logs").addEventListener("change", (event) => {
+    showProcessingLogs = (event.currentTarget as HTMLInputElement).checked;
+    localStorage.setItem("freeShowProcessingLogs", String(showProcessingLogs));
+    if (!showProcessingLogs) removeTab = "queue";
+    render();
+  });
+  byId("open-repository").addEventListener("click", () => void openUrl(APP_REPOSITORY));
+  byId("settings-about").addEventListener("click", showAbout);
+  byId<HTMLButtonElement>("check-updates").addEventListener("click", async (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    const detail = byId("update-detail");
+    const action = byId("update-action");
+    const releaseUrl = button.dataset.releaseUrl;
+    if (releaseUrl) {
+      await openUrl(releaseUrl);
+      return;
+    }
+    button.disabled = true;
+    action.textContent = "Checking…";
+    detail.textContent = "Contacting GitHub Releases…";
+    try {
+      const response = await fetch(LATEST_RELEASE_API, { headers: { Accept: "application/vnd.github+json" } });
+      if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
+      const release = await response.json() as { tag_name?: string; html_url?: string };
+      if (!release.tag_name || !release.html_url) throw new Error("The latest release information is incomplete.");
+      if (isNewerVersion(release.tag_name, APP_VERSION)) {
+        detail.textContent = `${release.tag_name} is available.`;
+        action.textContent = "Download";
+        button.dataset.releaseUrl = release.html_url;
+      } else {
+        detail.textContent = `You are using the latest version (${APP_VERSION}).`;
+        action.textContent = "Up to date";
+      }
+    } catch (error) {
+      detail.textContent = `Could not check for updates: ${String(error)}`;
+      action.textContent = "Try again";
+    } finally {
+      button.disabled = false;
+    }
+  });
 }
 function render(followLogs = false): void {
   byId("output").textContent = outputFolder ? name(outputFolder) : "Choose a folder";
@@ -176,5 +257,5 @@ void listen<CliOutput>("cli-output", ({ payload }) => {
 void invoke<Capability>("system_capabilities").then((value) => { cliPath = value.bundledCliPath ?? ""; byId("system").textContent = `✓ ${value.gpuSummary}`; byId("engine-title").textContent = cliPath ? "Removal engine ready" : "Removal engine unavailable"; byId("engine-detail").textContent = cliPath ? "Bundled video engine is ready." : "The bundled video engine is unavailable in this installation."; render(); });
 byId("add-videos").addEventListener("click", () => void addVideos()); byId("choose-output").addEventListener("click", () => void chooseOutput()); byId("start").addEventListener("click", () => void start()); byId("cancel").addEventListener("click", () => { running = false; void invoke("cancel_processing"); }); byId("clear").addEventListener("click", () => { if (!running) { jobs = []; render(); } }); byId("queue-tab").addEventListener("click", () => { removeTab = "queue"; render(); }); byId("logs-tab").addEventListener("click", () => { removeTab = "logs"; render(true); }); queue.addEventListener("click", (event) => { if ((event.target as HTMLElement).closest("#drop-add")) void addVideos(); });
 document.querySelector(".tool-nav")?.addEventListener("click", (event) => { const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!button) return; if (button.dataset.pro) showModal(`${button.dataset.pro} is available in Pro`, "This Free edition keeps the tool visible for discovery. Licensing and checkout will be added later.", "<div class=\"credit-card\"><strong>JV Studio Pro</strong><p>Unlock Custom Watermark and local FFmpeg Upscale when Pro launches.</p></div>"); if (button.dataset.page) { page = button.dataset.page as "remove" | "library"; render(); } });
-byId("settings").addEventListener("click", () => { showModal("Settings", "Free edition settings", `<div class="settings-group"><div><h3>Processing</h3><p>Choose how much detail appears while a video is running.</p></div><label class="settings-toggle"><span><b>Show processing logs</b><small>Add a Logs tab below Watermark Remove for live engine output.</small></span><input id="show-processing-logs" type="checkbox" ${showProcessingLogs ? "checked" : ""} /></label></div>`); byId<HTMLInputElement>("show-processing-logs").addEventListener("change", (event) => { showProcessingLogs = (event.currentTarget as HTMLInputElement).checked; localStorage.setItem("freeShowProcessingLogs", String(showProcessingLogs)); if (!showProcessingLogs) removeTab = "queue"; render(); }); }); byId("about").addEventListener("click", () => showModal("About JV Studio", `Free, local video watermark removal by Jsonpreet. ${APP_VERSION}`, "<p>Uses GeminiWatermarkTool and GeminiWatermarkTool-Video by Allen Kuo (allenk) under the upstream MIT terms.</p>")); byId("close-modal").addEventListener("click", () => byId("modal").classList.add("hidden")); byId("modal-done").addEventListener("click", () => byId("modal").classList.add("hidden"));
+byId("settings").addEventListener("click", showSettings); byId("about").addEventListener("click", showAbout); byId("close-modal").addEventListener("click", () => byId("modal").classList.add("hidden")); byId("modal-done").addEventListener("click", () => byId("modal").classList.add("hidden"));
 render();
