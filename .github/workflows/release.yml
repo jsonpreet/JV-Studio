@@ -61,6 +61,24 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
       - run: npm ci
+      - name: Import Apple Developer ID certificate
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/jv-studio-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 -D > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
       - name: Bundle removal engine (macOS)
         if: runner.os == 'macOS'
         shell: bash
@@ -84,11 +102,24 @@ jobs:
       - name: Create macOS release files
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           mkdir -p release-assets
           APP="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/JV Studio.app"
-          codesign --force --deep --sign - --timestamp=none "$APP"
+          ENGINE="$APP/Contents/Resources/bin/GeminiWatermarkTool-Video"
+          SIGNING_IDENTITY="$(security find-identity -v -p codesigning | awk -F '\"' '/Developer ID Application/ { print $2; exit }')"
+          test -n "$SIGNING_IDENTITY"
+          test -f "$ENGINE"
+          codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$ENGINE"
+          codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/notary-upload.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notary-upload.zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --wait
+          xcrun stapler staple "$APP"
+          spctl --assess --type execute --verbose=4 "$APP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "release-assets/JV-Studio-Free-macos-aarch64.zip"
       - name: Create Windows release files
         if: runner.os == 'Windows'
@@ -102,6 +133,10 @@ jobs:
           name: ${{ matrix.asset-name }}
           path: release-assets/*
           if-no-files-found: error
+      - name: Clean up signing keychain
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: security delete-keychain "$RUNNER_TEMP/jv-studio-signing.keychain-db" || true
 
   release:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
