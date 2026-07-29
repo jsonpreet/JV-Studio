@@ -131,7 +131,7 @@ function showSettings(): void {
   showModal(
     "Settings",
     "Free edition settings",
-    `<div class="settings-group"><div><h3>Processing</h3><p>Choose how much detail appears while a video is running.</p></div><label class="settings-toggle"><span><b>Show processing logs</b><small>Add a Logs tab below Watermark Remove for live engine output.</small></span><input id="show-processing-logs" type="checkbox" ${showProcessingLogs ? "checked" : ""} /></label></div>
+    `<div class="settings-group"><label class="settings-toggle"><span><b>Show processing logs</b><small>Add a Logs tab below Watermark Remove for live engine output.</small></span><input id="show-processing-logs" type="checkbox" ${showProcessingLogs ? "checked" : ""} /></label></div>
       <div class="settings-group"><div><h3>Appearance</h3><p>Use the system appearance or choose a consistent app theme.</p></div><label class="settings-toggle"><span><b>Theme</b><small>Applied immediately across the complete interface.</small></span><select id="app-theme"><option value="system" ${appTheme === "system" ? "selected" : ""}>System</option><option value="light" ${appTheme === "light" ? "selected" : ""}>Light</option><option value="dark" ${appTheme === "dark" ? "selected" : ""}>Dark</option></select></label></div>
       <div class="settings-group"><div><h3>Application</h3><p>Version information, updates, and project details.</p></div>
         <div class="settings-row static"><span><b>Current version</b><small>The installed JV Studio Free release.</small></span><span>${APP_VERSION}</span></div>
