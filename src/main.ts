@@ -93,6 +93,26 @@ function attachVideoPreviews(): void {
   });
 }
 
+function attachHistoryPreviews(): void {
+  const previews = byId("history").querySelectorAll<HTMLElement>(".history-card-preview");
+  previews.forEach((preview, index) => {
+    const item = history[index];
+    if (!item) return;
+    const source = videoSource(item.outputPath || item.inputPath);
+    if (!source) return;
+    const video = document.createElement("video");
+    video.className = "video-thumbnail";
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+    video.src = source;
+    video.addEventListener("loadedmetadata", () => {
+      video.currentTime = Math.min(0.1, Number.isFinite(video.duration) ? video.duration / 2 : 0.1);
+    }, { once: true });
+    preview.prepend(video);
+  });
+}
+
 function showModal(title: string, copy: string, body = ""): void {
   byId("modal-title").textContent = title;
   byId("modal-copy").textContent = copy;
@@ -241,7 +261,21 @@ function render(followLogs = false): void {
   byId("remove-page").classList.toggle("hidden", page !== "remove");
   byId("library-page").classList.toggle("hidden", page !== "library");
   document.querySelectorAll<HTMLButtonElement>("[data-page]").forEach((button) => button.classList.toggle("active", button.dataset.page === page));
-  byId("history").innerHTML = history.length ? history.map((item) => `<article class="history-card"><div class="history-main"><strong>${name(item.inputPath)}</strong><span>${item.outputPath ? `Output: ${name(item.outputPath)}` : "Imported"}</span></div></article>`).join("") : `<p class="empty-history">No videos processed yet.</p>`;
+  byId("history").innerHTML = history.length ? history.map((item) => {
+    const inputName = name(item.inputPath);
+    const outputLabel = item.outputPath ? `Output: ${name(item.outputPath)}` : "Imported";
+    return `<article class="history-card">
+      <div class="history-card-preview">
+        <span class="video-fallback">▶</span>
+        <span class="history-status ${item.outputPath ? "completed" : ""}">${item.outputPath ? "Completed" : "Imported"}</span>
+      </div>
+      <div class="history-main">
+        <strong title="${escapeHtml(inputName)}">${escapeHtml(inputName)}</strong>
+        <span title="${escapeHtml(outputLabel)}">${escapeHtml(outputLabel)}</span>
+      </div>
+    </article>`;
+  }).join("") : `<p class="empty-history">No videos processed yet.</p>`;
+  if (page === "library" && history.length) window.requestAnimationFrame(attachHistoryPreviews);
 }
 async function addVideos(): Promise<void> {
   try {

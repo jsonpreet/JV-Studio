@@ -2246,42 +2246,59 @@ button:disabled {
 
 .history-list {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-items: start;
+  gap: 14px;
 }
 
 .history-card {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 11px;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  flex-direction: column;
   border: 1px solid #e0e5ed;
-  border-radius: 11px;
+  border-radius: 13px;
   background: white;
-  box-shadow: 0 2px 8px rgba(25, 35, 60, 0.035);
+  box-shadow: 0 3px 12px rgba(25, 35, 60, 0.06);
 }
 
-.history-thumb {
+.history-card-preview {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 36px;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   color: white;
-  border-radius: 8px;
-  background: linear-gradient(145deg, #4a87ff, #6758df);
-  box-shadow: 0 2px 6px rgba(31, 45, 82, 0.12);
+  background:
+    linear-gradient(135deg, rgba(50, 69, 110, 0.18), rgba(12, 20, 40, 0.45)),
+    #303d58;
+}
+
+.history-card-preview .video-thumbnail {
+  position: relative;
+  z-index: 1;
+}
+
+.history-card-preview .history-status {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
 }
 
 .history-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+  padding: 11px 12px 13px;
 }
 
 .history-main strong {
+  overflow: hidden;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-main span,
@@ -2300,7 +2317,8 @@ button:disabled {
   font-weight: 750;
   text-transform: capitalize;
   border-radius: 999px;
-  background: #edf0f5;
+  background: rgba(237, 240, 245, 0.92);
+  backdrop-filter: blur(4px);
 }
 
 .history-status.completed {

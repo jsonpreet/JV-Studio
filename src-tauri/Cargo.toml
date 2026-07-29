@@ -1,6 +1,6 @@
 [package]
 name = "jv-studio"
-version = "0.3.18"
+version = "0.3.19"
 description = "Cross-platform batch UI for GeminiWatermarkTool-Video"
 authors = ["Jsonpreet"]
 edition = "2021"
