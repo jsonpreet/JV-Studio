@@ -54,7 +54,14 @@ const stripTerminalControl = (text: string) => text.replace(/\u001b\[[0-?]*[ -/]
 const log = (line: string) => { logs = [...logs.slice(-199), line]; render(true); };
 const name = (path: string) => path.split(/[\\/]/).pop() || path;
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
-const videoSource = (path: string) => `${convertFileSrc(path)}#t=0.1`;
+const videoSource = (path: string) => {
+  try {
+    return `${convertFileSrc(path)}#t=0.1`;
+  } catch (error) {
+    console.warn("Could not create local video preview URL", error);
+    return "";
+  }
+};
 
 function showModal(title: string, copy: string, body = ""): void {
   byId("modal-title").textContent = title;
@@ -82,9 +89,10 @@ function render(followLogs = false): void {
     const progress = Math.round(job.progress * 100);
     const isRunning = job.state === "running";
     const stateLabel = isRunning ? "Removing watermark" : job.state === "succeeded" ? "Completed" : job.state === "failed" ? "Failed" : job.state === "cancelled" ? "Cancelled" : "Ready";
+    const source = videoSource(job.inputPath);
     return `<article class="video-card ${job.state}">
       <div class="video-card-preview">
-        <span class="video-fallback">▶</span><video class="video-thumbnail" src="${escapeHtml(videoSource(job.inputPath))}" muted playsinline preload="metadata"></video>
+        <span class="video-fallback">▶</span>${source ? `<video class="video-thumbnail" src="${escapeHtml(source)}" muted playsinline preload="metadata"></video>` : ""}
         ${isRunning ? `<div class="video-processing-overlay"><div class="circular-progress" style="--progress: ${progress * 3.6}deg"><span>${progress}%</span></div><strong>Removing</strong></div>` : `<span class="video-state-badge ${job.state}">${stateLabel}</span>`}
       </div>
       <div class="video-card-copy"><strong title="${escapeHtml(name(job.inputPath))}">${escapeHtml(name(job.inputPath))}</strong><span>${escapeHtml(job.detail || stateLabel)}</span></div>
