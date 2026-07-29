@@ -2734,6 +2734,20 @@ button.settings-row:disabled > span:last-child {
     border-color: #383f4d;
   }
 
+  .info-dialog .settings-group {
+    border-color: #3a4250;
+  }
+
+  .info-dialog .settings-group > div:first-child,
+  .info-dialog .settings-row,
+  .info-dialog .settings-toggle {
+    border-bottom-color: rgba(151, 165, 189, 0.16);
+  }
+
+  .info-dialog .settings-group > :last-child {
+    border-bottom-color: transparent;
+  }
+
   .settings-group p,
   .settings-row small,
   .settings-toggle small,

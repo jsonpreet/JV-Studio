@@ -14,7 +14,7 @@ video engine. JV Studio is independent and is not affiliated with Google.
 
 **Repository:** [jsonpreet/JV-Studio](https://github.com/jsonpreet/JV-Studio)
 
-**Version:** 0.3.15
+**Version:** 0.3.16
 
 ## Editions
 
@@ -184,12 +184,12 @@ Applications folder, then open it. The app inside the archive is Developer ID
 signed and notarized; the ZIP format avoids unreliable temporary-space limits
 on hosted macOS build runners.
 
-To publish version `0.3.15`, push the project to GitHub and create its matching
+To publish version `0.3.16`, push the project to GitHub and create its matching
 version tag:
 
 ```bash
-git tag v0.3.15
-git push origin v0.3.15
+git tag v0.3.16
+git push origin v0.3.16
 ```
 
 GitHub Actions verifies that `package.json`, `Cargo.toml`, and
