@@ -3,6 +3,7 @@
     Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #172036;
   background: #f3f5f9;
+  color-scheme: light;
   font-synthesis: none;
 }
 
@@ -1237,19 +1238,6 @@ button:disabled {
   margin-top: auto;
 }
 
-.free-engine {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 20px;
-  border-bottom: 1px solid #e4e8f0;
-  background: #fbfcff;
-}
-
-.free-engine div { display: grid; gap: 2px; }
-.free-engine strong { color: #222e49; font-size: 13px; }
-.free-engine span { color: #758198; font-size: 11px; }
 .job-state { color: #758198; font-size: 11px; text-transform: capitalize; }
 .job-state.succeeded { color: #14835f; }
 .job-state.failed { color: #c13f49; }
@@ -1262,7 +1250,7 @@ button:disabled {
 
 #remove-page:not(.hidden) {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
 }
 
@@ -1450,6 +1438,7 @@ button:disabled {
   :root {
     color: #e8ecf4;
     background: #171a22;
+    color-scheme: dark;
   }
 
   .shell {
@@ -1481,7 +1470,40 @@ button:disabled {
   }
 
   .drop-zone {
+    color: #d7deec;
     border-color: #465064;
+    background: #20242d;
+  }
+
+  .drop-zone span,
+  .workspace-copy p,
+  .app-header p,
+  .overall span,
+  .section-heading span {
+    color: #9da8bc;
+  }
+
+  .queue.drop-active {
+    background: #202c42;
+    outline-color: #6e91db;
+  }
+
+  .text-button {
+    color: #aab5ca;
+  }
+
+  .video-card {
+    border-color: #3a4251;
+    background: #242934;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18);
+  }
+
+  .video-card-copy strong {
+    color: #edf1f8;
+  }
+
+  .video-card-copy span {
+    color: #9ba6ba;
   }
 
   .button.secondary {
@@ -2704,6 +2726,24 @@ button.settings-row:disabled > span:last-child {
     background: #1b1f28;
   }
 
+  .workspace-copy p {
+    color: #9da8bc;
+  }
+
+  .settings-group > div:first-child {
+    border-color: #383f4d;
+  }
+
+  .settings-group p,
+  .settings-row small,
+  .settings-toggle small,
+  .creator-link small,
+  .credit-card p,
+  .info-content > p,
+  .info-content > small {
+    color: #9da8bc;
+  }
+
   .output-card,
   .history-card,
   .credit-card,
@@ -2716,6 +2756,20 @@ button.settings-row:disabled > span:last-child {
     color: #e8ecf4;
     border-color: #383f4d;
     background: #242934;
+  }
+
+  .settings-row.static {
+    background: #242934;
+  }
+
+  progress::-webkit-progress-bar {
+    background: #363d49;
+  }
+
+  .button.danger {
+    color: #ffabb3;
+    border-color: #72444a;
+    background: #38272b;
   }
 
   .filter-chip {

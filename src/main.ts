@@ -1,5 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import appPackage from "../package.json";
@@ -19,6 +21,7 @@ let outputFolder = localStorage.getItem("freeOutputFolder") ?? "";
 let page: "remove" | "library" = "remove";
 let removeTab: "queue" | "logs" = "queue";
 let showProcessingLogs = localStorage.getItem("freeShowProcessingLogs") === "true";
+let appTheme = (localStorage.getItem("freeAppTheme") ?? "system") as "system" | "light" | "dark";
 let running = false;
 const history = JSON.parse(localStorage.getItem("freeHistory") ?? "[]") as Array<{ inputPath: string; outputPath?: string; at: number }>;
 const APP_VERSION = `v${appPackage.version}`;
@@ -45,7 +48,6 @@ app.innerHTML = `
       <header class="app-header"><div class="header-copy"><div class="title-row"><h1>JV Studio</h1><button id="about" class="about-link">About</button></div><p>Remove visible video watermarks locally.</p><div class="app-credit"><span>Free edition</span><button id="author-link" class="author-link" title="x.com/jsonpreet">By Jsonpreet ${X_ICON}</button><span>${APP_VERSION}</span></div></div><button id="add-videos" class="button secondary">Add videos</button></header>
       <section id="remove-page">
         <section class="workspace-bar"><div class="workspace-copy"><span class="eyebrow">Watermark removal</span><h2>Remove watermarks</h2><p>Add Omini or Veo clips and process them one at a time. Originals are never changed.</p></div><button id="choose-output" class="output-card"><span class="eyebrow">Output folder</span><strong id="output">Choose a folder</strong><span class="chevron">›</span></button></section>
-        <section class="free-engine"><div><strong id="engine-title">Removal engine</strong><span id="engine-detail">Checking bundled engine…</span></div></section>
         <section class="queue-section"><div class="section-heading"><div><h2 id="queue-title">Queue</h2><span id="count">0 files</span></div><div class="queue-actions"><button id="queue-tab" class="text-button tab-button active">Videos</button><button id="logs-tab" class="text-button tab-button hidden">Logs <span id="log-count">0</span></button><button id="clear" class="text-button">Clear all</button></div></div><div id="queue" class="queue"></div><div id="logs-panel" class="activity-log hidden"></div></section>
         <footer class="footer"><div class="overall"><div><strong id="status">Add videos to begin</strong><span id="summary">0 of 0</span></div><progress id="progress" max="1" value="0"></progress></div><button id="cancel" class="button danger hidden">Cancel</button><button id="start" class="button primary">Start</button></footer>
       </section>
@@ -130,6 +132,7 @@ function showSettings(): void {
     "Settings",
     "Free edition settings",
     `<div class="settings-group"><div><h3>Processing</h3><p>Choose how much detail appears while a video is running.</p></div><label class="settings-toggle"><span><b>Show processing logs</b><small>Add a Logs tab below Watermark Remove for live engine output.</small></span><input id="show-processing-logs" type="checkbox" ${showProcessingLogs ? "checked" : ""} /></label></div>
+      <div class="settings-group"><div><h3>Appearance</h3><p>Use the system appearance or choose a consistent app theme.</p></div><label class="settings-toggle"><span><b>Theme</b><small>Applied immediately across the complete interface.</small></span><select id="app-theme"><option value="system" ${appTheme === "system" ? "selected" : ""}>System</option><option value="light" ${appTheme === "light" ? "selected" : ""}>Light</option><option value="dark" ${appTheme === "dark" ? "selected" : ""}>Dark</option></select></label></div>
       <div class="settings-group"><div><h3>Application</h3><p>Version information, updates, and project details.</p></div>
         <div class="settings-row static"><span><b>Current version</b><small>The installed JV Studio Free release.</small></span><span>${APP_VERSION}</span></div>
         <button id="check-updates" class="settings-row"><span><b>Check for updates</b><small id="update-detail">Check the official GitHub Releases channel.</small></span><span id="update-action">Check now</span></button>
@@ -143,6 +146,11 @@ function showSettings(): void {
     localStorage.setItem("freeShowProcessingLogs", String(showProcessingLogs));
     if (!showProcessingLogs) removeTab = "queue";
     render();
+  });
+  byId<HTMLSelectElement>("app-theme").addEventListener("change", (event) => {
+    appTheme = (event.currentTarget as HTMLSelectElement).value as typeof appTheme;
+    localStorage.setItem("freeAppTheme", appTheme);
+    void applyTheme();
   });
   byId("open-repository").addEventListener("click", () => void openUrl(APP_REPOSITORY));
   byId("settings-about").addEventListener("click", showAbout);
@@ -178,6 +186,14 @@ function showSettings(): void {
       button.disabled = false;
     }
   });
+}
+
+async function applyTheme(): Promise<void> {
+  try {
+    await getCurrentWindow().setTheme(appTheme === "system" ? null : appTheme);
+  } catch (error) {
+    console.warn("Could not apply the selected app theme", error);
+  }
 }
 function render(followLogs = false): void {
   byId("output").textContent = outputFolder ? name(outputFolder) : "Choose a folder";
@@ -218,14 +234,75 @@ function render(followLogs = false): void {
   byId("history").innerHTML = history.length ? history.map((item) => `<article class="history-card"><div class="history-main"><strong>${name(item.inputPath)}</strong><span>${item.outputPath ? `Output: ${name(item.outputPath)}` : "Imported"}</span></div></article>`).join("") : `<p class="empty-history">No videos processed yet.</p>`;
 }
 async function addVideos(): Promise<void> {
-  const selected = await open({ multiple: true, directory: false, filters: [{ name: "MP4 videos", extensions: ["mp4"] }] });
-  if (!selected) return;
-  const paths = Array.isArray(selected) ? selected : [selected];
-  jobs.push(...paths.map((inputPath) => ({ id: crypto.randomUUID(), inputPath, state: "pending" as const, detail: "Ready", progress: 0 })));
-  log(`Added ${paths.length} video${paths.length === 1 ? "" : "s"}.`);
-  render();
+  try {
+    const selected = await open({ multiple: true, directory: false, filters: [{ name: "MP4 videos", extensions: ["mp4"] }] });
+    if (!selected) return;
+    addVideoPaths(Array.isArray(selected) ? selected : [selected]);
+  } catch (error) {
+    const message = `Could not open the video picker: ${String(error)}`;
+    log(message);
+    showModal("Could not add videos", message);
+  }
 }
-async function chooseOutput(): Promise<void> { const folder = await open({ directory: true, multiple: false }); if (typeof folder === "string") { outputFolder = folder; localStorage.setItem("freeOutputFolder", folder); render(); } }
+
+function addVideoPaths(paths: string[]): void {
+  const existing = new Set(jobs.map((job) => job.inputPath));
+  const accepted = paths.filter((path) => /\.mp4$/i.test(path) && !existing.has(path));
+  if (!accepted.length) {
+    showModal("No new MP4 videos found", "Drop MP4 video files that are not already in the queue.");
+    return;
+  }
+  jobs.push(...accepted.map((inputPath) => ({ id: crypto.randomUUID(), inputPath, state: "pending" as const, detail: "Ready", progress: 0 })));
+  removeTab = "queue";
+  log(`Added ${accepted.length} video${accepted.length === 1 ? "" : "s"}.`);
+}
+
+async function chooseOutput(): Promise<void> {
+  try {
+    const folder = await open({ directory: true, multiple: false });
+    if (typeof folder === "string") {
+      outputFolder = folder;
+      localStorage.setItem("freeOutputFolder", folder);
+      render();
+    }
+  } catch (error) {
+    showModal("Could not choose an output folder", String(error));
+  }
+}
+
+async function setupFileDrop(): Promise<void> {
+  const setDropActive = (active: boolean) => queue.classList.toggle("drop-active", active);
+  window.addEventListener("dragenter", (event) => {
+    event.preventDefault();
+    setDropActive(true);
+  });
+  window.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    setDropActive(true);
+  });
+  window.addEventListener("dragleave", (event) => {
+    event.preventDefault();
+    if (event.relatedTarget === null) setDropActive(false);
+  });
+  window.addEventListener("drop", (event) => {
+    event.preventDefault();
+    setDropActive(false);
+  });
+
+  try {
+    await getCurrentWebview().onDragDropEvent(({ payload }) => {
+      if (payload.type === "enter" || payload.type === "over") {
+        setDropActive(true);
+      } else {
+        setDropActive(false);
+      }
+      if (payload.type === "drop") addVideoPaths(payload.paths);
+    });
+  } catch (error) {
+    console.warn("Native file drop is unavailable", error);
+  }
+}
 async function start(): Promise<void> {
   if (!cliPath || !outputFolder) return;
   running = true; render();
@@ -262,7 +339,14 @@ void listen<CliOutput>("cli-output", ({ payload }) => {
   }
   if (text) log(`${payload.stream === "stderr" ? "• " : ""}${text}`);
 });
-void invoke<Capability>("system_capabilities").then((value) => { cliPath = value.bundledCliPath ?? ""; byId("system").textContent = `✓ ${value.gpuSummary}`; byId("engine-title").textContent = cliPath ? "Removal engine ready" : "Removal engine unavailable"; byId("engine-detail").textContent = cliPath ? "Bundled video engine is ready." : "The bundled video engine is unavailable in this installation."; render(); });
+void invoke<Capability>("system_capabilities").then((value) => {
+  cliPath = value.bundledCliPath ?? "";
+  byId("system").textContent = `✓ ${value.gpuSummary}`;
+  if (!cliPath) log("The bundled video processor is unavailable in this installation.");
+  render();
+});
+void setupFileDrop();
+void applyTheme();
 byId("add-videos").addEventListener("click", () => void addVideos()); byId("choose-output").addEventListener("click", () => void chooseOutput()); byId("start").addEventListener("click", () => void start()); byId("cancel").addEventListener("click", () => { running = false; void invoke("cancel_processing"); }); byId("clear").addEventListener("click", () => { if (!running) { jobs = []; render(); } }); byId("queue-tab").addEventListener("click", () => { removeTab = "queue"; render(); }); byId("logs-tab").addEventListener("click", () => { removeTab = "logs"; render(true); }); queue.addEventListener("click", (event) => { if ((event.target as HTMLElement).closest("#drop-add")) void addVideos(); });
 document.querySelector(".tool-nav")?.addEventListener("click", (event) => { const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!button) return; if (button.dataset.pro) showModal(`${button.dataset.pro} is available in Pro`, "This Free edition keeps the tool visible for discovery. Licensing and checkout will be added later.", "<div class=\"credit-card\"><strong>JV Studio Pro</strong><p>Unlock Custom Watermark and local FFmpeg Upscale when Pro launches.</p></div>"); if (button.dataset.page) { page = button.dataset.page as "remove" | "library"; render(); } });
 byId("settings").addEventListener("click", showSettings); byId("about").addEventListener("click", showAbout); byId("author-link").addEventListener("click", () => void openUrl(AUTHOR_X_PROFILE)); byId("sidebar-github").addEventListener("click", () => void openUrl(APP_REPOSITORY)); byId("sidebar-x").addEventListener("click", () => void openUrl(AUTHOR_X_PROFILE)); byId("close-modal").addEventListener("click", () => byId("modal").classList.add("hidden")); byId("modal-done").addEventListener("click", () => byId("modal").classList.add("hidden"));
