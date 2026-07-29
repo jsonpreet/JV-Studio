@@ -11,7 +11,7 @@ app for batch-processing supported Omini and Veo video clips with the upstream
 video engine. JV Studio is independent and is not affiliated with Google.
 
 **Author:** Jsonpreet  
-**Version:** 0.3.3
+**Version:** 0.3.4
 
 ## Editions
 
@@ -177,12 +177,12 @@ The included `.github/workflows/release.yml` workflow builds:
 - macOS Apple Silicon `.app` ZIP bundle;
 - Windows x64 NSIS installer.
 
-To publish version `0.3.3`, push the project to GitHub and create its matching
+To publish version `0.3.4`, push the project to GitHub and create its matching
 version tag:
 
 ```bash
-git tag v0.3.3
-git push origin v0.3.3
+git tag v0.3.4
+git push origin v0.3.4
 ```
 
 GitHub Actions verifies that `package.json`, `Cargo.toml`, and

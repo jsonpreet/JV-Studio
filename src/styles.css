@@ -1230,6 +1230,34 @@ button:disabled {
 .job-state.failed { color: #c13f49; }
 .empty-log, .empty-history { padding: 18px; color: #7b869a; font-size: 12px; }
 
+/* Free removal workspace: keep the activity pane independently scrollable. */
+.free-app .shell {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+#remove-page:not(.hidden) {
+  display: grid;
+  grid-template-rows: auto auto minmax(116px, auto) minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+.free-app .activity-log {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.free-app .queue-row > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.free-app .queue-row progress {
+  width: min(260px, 100%);
+  height: 5px;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #e8ecf4;
