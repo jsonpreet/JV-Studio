@@ -127,7 +127,12 @@ jobs:
           rm -f "$RUNNER_TEMP/notary-upload.zip"
           xcrun stapler staple "$APP"
           spctl --assess --type execute --verbose=4 "$APP"
-          hdiutil create -volname "JV Studio Free" -srcfolder "$APP" -ov -format UDZO "release-assets/JV-Studio-Free_${VERSION}_aarch64.dmg"
+          DMG_STAGE="$RUNNER_TEMP/jv-studio-dmg"
+          mkdir -p "$DMG_STAGE"
+          ditto "$APP" "$DMG_STAGE/JV Studio.app"
+          ln -s /Applications "$DMG_STAGE/Applications"
+          hdiutil create -volname "JV Studio Free" -srcfolder "$DMG_STAGE" -ov -format UDZO "release-assets/JV-Studio-Free_${VERSION}_aarch64.dmg"
+          rm -rf "$DMG_STAGE"
           xcrun notarytool submit "release-assets/JV-Studio-Free_${VERSION}_aarch64.dmg" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --wait
           xcrun stapler staple "release-assets/JV-Studio-Free_${VERSION}_aarch64.dmg"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "release-assets/JV-Studio-Free-macos-aarch64.zip"
