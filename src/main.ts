@@ -197,7 +197,7 @@ app.innerHTML = `
       </div>
     </aside>
 
-    <section class="shell">
+    <section id="app-shell" class="shell">
       <header class="app-header">
         <div class="header-copy">
           <div class="title-row">
@@ -830,10 +830,15 @@ function render(): void {
     "hidden",
     libraryOpen || activePage === "remove",
   );
+  byId("app-shell").classList.toggle(
+    "has-tool-controls",
+    !libraryOpen && activePage !== "remove",
+  );
   byId("library-page").classList.toggle("hidden", !libraryOpen);
   byId("add-videos").classList.toggle("hidden", libraryOpen);
   const logsVisible =
     !libraryOpen && showProcessingLogs && removeTab === "logs";
+  byId("app-shell").classList.toggle("showing-logs", logsVisible);
   queueElement.classList.toggle("hidden", logsVisible);
   byId("activity-section").classList.toggle("hidden", !logsVisible);
   byId("videos-tab").classList.toggle("active", !logsVisible);
