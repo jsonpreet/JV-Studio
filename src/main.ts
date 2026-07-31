@@ -867,6 +867,10 @@ function render(): void {
     "watermark-media-grid",
     activePage === "watermark",
   );
+  queueElement.classList.toggle(
+    "job-grid",
+    activePage === "remove" && jobs.length > 0,
+  );
   if (activePage === "watermark") {
     renderWatermarkMedia();
   } else if (jobs.length === 0) {
@@ -2439,9 +2443,13 @@ try {
   if (capabilities.bundledFfmpegPath) {
     ffmpegPath = capabilities.bundledFfmpegPath;
     localStorage.setItem("ffmpegPath", ffmpegPath);
-  } else if (!ffmpegPath && capabilities.ffmpegPath) {
+  } else if (capabilities.ffmpegPath) {
+    // Prefer the detected executable over a stale path left by an older build.
     ffmpegPath = capabilities.ffmpegPath;
     localStorage.setItem("ffmpegPath", ffmpegPath);
+  } else {
+    ffmpegPath = "";
+    localStorage.removeItem("ffmpegPath");
   }
   if (capabilities.standardUpscaleAvailable) {
     addLog(

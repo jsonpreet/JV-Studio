@@ -332,6 +332,14 @@ button {
   outline-offset: -8px;
 }
 
+.queue.job-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+  align-content: start;
+  gap: 12px;
+  padding: 14px 20px 20px;
+}
+
 .drop-zone {
   display: flex;
   flex-direction: column;
@@ -343,6 +351,8 @@ button {
   color: #34415c;
   border: 2px dashed #c6cedc;
   border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
 }
 
 .drop-zone span {
@@ -363,6 +373,47 @@ button {
   border-bottom: 1px solid #edf0f5;
 }
 
+.queue.job-grid .job-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: start;
+  gap: 8px 9px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e0e5ed;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(25, 35, 60, 0.035);
+}
+
+.queue.job-grid .job-thumbnail {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 132px;
+  flex: none;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.queue.job-grid .state-icon {
+  grid-column: 1;
+  width: 28px;
+  height: 28px;
+}
+
+.queue.job-grid .job-main {
+  grid-column: 2;
+}
+
+.queue.job-grid .row-action,
+.queue.job-grid .icon-button {
+  grid-column: 3;
+  align-self: start;
+  padding: 4px 2px;
+}
+
 .job-thumbnail {
   position: relative;
   display: grid;
@@ -381,7 +432,9 @@ button {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  background: #e9edf5;
 }
 
 .video-thumbnail-placeholder {
@@ -1570,7 +1623,7 @@ button:disabled {
 }
 
 .shell {
-  grid-template-rows: auto auto auto minmax(170px, 1fr) 105px auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
 }
@@ -2587,6 +2640,20 @@ button.settings-row:disabled > span:last-child {
 
   .queue.watermark-media-grid {
     background: #1b1f28;
+  }
+
+  .queue.job-grid .job-row {
+    border-color: #3b4352;
+    background: #242934;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+  }
+
+  .queue.job-grid .job-thumbnail {
+    background: #1d222d;
+  }
+
+  .video-thumbnail {
+    background: #1d222d;
   }
 
   .watermark-upload-card,
