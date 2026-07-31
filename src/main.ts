@@ -480,8 +480,12 @@ function runThumbnailQueue(): void {
       .then((dataUrl) => {
         videoThumbnails.set(path, { status: "ready", dataUrl });
       })
-      .catch(() => {
+      .catch((error) => {
         videoThumbnails.set(path, { status: "failed" });
+        addLog(
+          "ERROR",
+          `Thumbnail unavailable for ${filename(path)}: ${String(error)}`,
+        );
       })
       .finally(() => {
         activeThumbnailWorkers -= 1;

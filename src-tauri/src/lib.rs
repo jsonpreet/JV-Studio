@@ -999,6 +999,46 @@ fn thumbnail_cache_key(path: &Path) -> Result<String, String> {
     Ok(format!("{:016x}", hasher.finish()))
 }
 
+fn extract_video_thumbnail(
+    ffmpeg_path: &str,
+    input_path: &str,
+    seek_seconds: &str,
+    thumbnail: &Path,
+) -> Result<(), String> {
+    let thumbnail_path = thumbnail.to_string_lossy();
+    let output = Command::new(ffmpeg_path)
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-ss",
+            seek_seconds,
+            "-i",
+            input_path,
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=480:-2:force_original_aspect_ratio=decrease",
+            "-q:v",
+            "4",
+            "-y",
+            &thumbnail_path,
+        ])
+        .output()
+        .map_err(|error| format!("Could not start FFmpeg thumbnail extraction: {error}"))?;
+
+    if output.status.success() && thumbnail.is_file() {
+        return Ok(());
+    }
+
+    let detail = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+    if detail.is_empty() {
+        Err("FFmpeg could not extract a video thumbnail.".into())
+    } else {
+        Err(format!("FFmpeg could not extract a video thumbnail: {detail}"))
+    }
+}
+
 #[tauri::command]
 async fn video_thumbnail(
     app: AppHandle,
@@ -1023,29 +1063,17 @@ async fn video_thumbnail(
             if !Path::new(&ffmpeg_path).is_file() {
                 return Err("FFmpeg is missing.".into());
             }
-            let status = Command::new(&ffmpeg_path)
-                .args([
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-ss",
-                    "0.500",
-                    "-i",
-                    &input_path,
-                    "-frames:v",
-                    "1",
-                    "-vf",
-                    "scale=480:-2:force_original_aspect_ratio=decrease",
-                    "-q:v",
-                    "4",
-                    "-y",
-                    &thumbnail.to_string_lossy(),
-                ])
-                .status()
-                .map_err(|error| format!("Could not start FFmpeg thumbnail extraction: {error}"))?;
-            if !status.success() || !thumbnail.is_file() {
+            if let Err(primary_error) =
+                extract_video_thumbnail(&ffmpeg_path, &input_path, "0.500", &thumbnail)
+            {
                 let _ = fs::remove_file(&thumbnail);
-                return Err("FFmpeg could not extract a video thumbnail.".into());
+                extract_video_thumbnail(&ffmpeg_path, &input_path, "0", &thumbnail).map_err(
+                    |fallback_error| {
+                        format!(
+                            "Thumbnail extraction failed at 0.5s ({primary_error}); retry at the first frame also failed ({fallback_error})"
+                        )
+                    },
+                )?;
             }
         }
 

@@ -116,6 +116,11 @@ jobs:
           cp ffmpeg-install/bin/ffmpeg bin/ffmpeg
           cp ffmpeg-install/bin/ffprobe bin/ffprobe
           chmod 755 bin/ffmpeg bin/ffprobe
+          # The app must not depend on Homebrew libraries installed on the end user's Mac.
+          ! otool -L bin/ffmpeg | grep -Eq '/(opt/homebrew|usr/local)/'
+          ! otool -L bin/ffprobe | grep -Eq '/(opt/homebrew|usr/local)/'
+          bin/ffmpeg -version
+          bin/ffprobe -version
           curl -fL "https://raw.githubusercontent.com/FFmpeg/FFmpeg/${FFmpeg_COMMIT}/LICENSE.md" -o bin/FFMPEG-LICENSE.txt
           printf 'FFmpeg %s\nSource commit: %s\nConfiguration: LGPL-only, no GPL/nonfree components.\n' "$FFmpeg_VERSION" "$FFmpeg_COMMIT" > bin/FFMPEG-SOURCE.txt
           ! bin/ffmpeg -buildconf 2>&1 | grep -Eq -- '--enable-gpl|--enable-nonfree'

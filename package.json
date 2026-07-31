@@ -1,7 +1,7 @@
 {
   "name": "jv-studio",
   "private": true,
-  "version": "0.4.2",
+  "version": "0.4.3",
   "author": "Jsonpreet",
   "type": "module",
   "scripts": {
