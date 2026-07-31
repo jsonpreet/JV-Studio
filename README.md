@@ -7,8 +7,9 @@ A small cross-platform desktop application with a bundled
 Users do not need to download or locate a separate CLI.
 
 **JV Studio is a Gemini Watermark Removal Tool for Videos**: a local desktop
-app for batch-processing supported Omini and Veo video clips with the upstream
-video engine. JV Studio is independent and is not affiliated with Google.
+app for batch-processing supported Omini and Veo video clips, with reusable
+custom text/image watermarking. JV Studio is independent and is not affiliated
+with Google.
 
 **Author:** [Jsonpreet](https://x.com/jsonpreet)
 
@@ -19,13 +20,9 @@ video engine. JV Studio is independent and is not affiliated with Google.
 ## Editions
 
 This repository publishes the **Free** edition of JV Studio. Watermark Remove,
-Library, and Settings are available locally at no cost. Custom Watermark and
-FFmpeg Upscale stay visible in the sidebar so users can discover them, but they
-open an upgrade message in the Free build.
-
-The full Pro edition is maintained separately in a private repository. It will
-gain licensing and checkout support in a later release; no payment or account
-is required by this Free edition.
+Custom Watermark, Library, and Settings are available locally at no cost. The
+upscale implementation remains in the codebase but is currently hidden from
+the sidebar while it is being finalized.
 
 ## Upstream attribution
 
@@ -43,17 +40,17 @@ maintained by Jsonpreet.
 JV Studio is an independent project. It is not affiliated with or
 endorsed by Google.
 
-## Why this CLI
+## Why this upstream engine
 
 `allenk/GeminiWatermarkTool` currently focuses on still images. Its own README
 directs video users to the separately released `GeminiWatermarkTool-Video`
 binary in `allenk/VeoWatermarkRemover`.
 
-The wrapper deliberately keeps each platform's CLI separate:
+The app keeps the platform-specific binaries separate:
 
 - macOS selects `GeminiWatermarkTool-Video`;
 - Windows selects `GeminiWatermarkTool-Video.exe`;
-- either binary can be replaced whenever upstream ships a newer release;
+- either binary can be updated whenever upstream ships a newer release;
 - the UI never modifies an input path;
 - every run uses explicit `-i input -o output` arguments;
 - name collisions become `_cleaned_2`, `_cleaned_3`, and so on.
@@ -61,16 +58,20 @@ The wrapper deliberately keeps each platform's CLI separate:
 ## Features
 
 - drag/drop or select multiple MP4 files (the format documented by upstream);
-- choose and remember the CLI and output folder;
+- choose and remember an output folder; the removal engine is bundled in release
+  builds and does not require a separate CLI download;
 - serial queue (one CLI child process at a time);
 - per-file and overall progress parsed from the CLI's percentage output;
 - live success, failure, and CLI logs;
 - cancel the current batch and retry individual failures or all failures;
 - optional `--legacy` and `--ml` switches;
 - automatic CPU, memory, GPU, Metal, FFmpeg, and hardware-encoder checks;
-- streamlined sidebar for Watermark Remove, Custom Watermark, Upscale, and Library;
+- streamlined sidebar for Watermark Remove, Custom Watermark, and Library;
 - local recent-video history for imported and completed clips;
-- locked Custom Watermark and Upscale entry points that explain the future Pro edition;
+- reusable text and image watermark layers with preview, movement, rotation,
+  timing, opacity, font, and position controls;
+- advanced Settings with processing switches, encoder choice, appearance,
+  update checks, repository information, and About details;
 - original clips are never overwritten.
 
 ## Processing order
@@ -79,7 +80,9 @@ For every queued video the app runs:
 
 ```text
 optional existing-watermark removal
-  → cleaned video in your chosen output folder
+  → optional custom text/image watermark layers
+  → optional FFmpeg enhancement
+  → video in your chosen output folder
 ```
 
 The Free edition does not modify the original clip.
@@ -92,9 +95,18 @@ and copy it into the application:
 - macOS: `bin/GeminiWatermarkTool-Video`
 - Windows: `bin/GeminiWatermarkTool-Video.exe`
 
-JV Studio always prefers this built-in engine. The file selector is retained
-only as a development fallback when someone runs an incomplete source checkout.
-Release packages include the upstream attribution and MIT notice.
+JV Studio always prefers this built-in engine. An incomplete source checkout
+reports the missing bundle in Activity rather than asking users to locate a
+separate repository. Release packages include the upstream attribution and MIT
+notice.
+
+## Bundled FFmpeg
+
+Release builds also include pinned FFmpeg and FFprobe 8.1.2 LGPL-only builds.
+They power custom text/image watermark rendering, video previews, and local
+video enhancement without requiring Homebrew, winget, or a separate FFmpeg
+download. The release workflow records the upstream license and source build
+metadata alongside the binaries.
 
 ## Architecture
 
@@ -130,7 +142,7 @@ previous results are preserved.
 ## Run from source
 
 ```bash
-cd GeminiVideoBatcher
+cd JV-Studio
 npm install
 npm run tauri:dev
 ```
@@ -157,14 +169,14 @@ variants under `src-tauri/icons`.
 Build macOS on a Mac:
 
 ```bash
-cd GeminiVideoBatcher
+cd JV-Studio
 npm run tauri:build
 ```
 
 Build Windows on a Windows machine using the same source:
 
 ```powershell
-cd GeminiVideoBatcher
+cd JV-Studio
 npm install
 npm run tauri:build
 ```
@@ -205,15 +217,13 @@ the matching `v<version>` tag. Manual runs are also available from the Actions
 tab. The default workflow uses ad-hoc signing for macOS; production distribution
 should add Apple notarization and Windows code-signing secrets.
 
-## CLI installation note
+## Development and upstream note
 
-Download the matching current release:
-
-<https://github.com/allenk/VeoWatermarkRemover/releases/latest>
-
-The upstream binaries are unsigned. Follow the release's verification and
-first-run guidance. This project does not download, alter, or redistribute
-them.
+Source checkouts do not fetch large third-party binaries automatically. The
+release workflow downloads the pinned, checksum-verified upstream removal
+engine and FFmpeg builds, includes their attribution, and packages them inside
+the application. For local development, place compatible binaries in `bin/` or
+install FFmpeg/FFprobe on the host system.
 
 Stopping terminates the current child process on either platform and leaves
 remaining items pending. A partial output produced by a cancelled/failed run

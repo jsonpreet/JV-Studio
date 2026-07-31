@@ -93,6 +93,48 @@ jobs:
           Expand-Archive removal-engine.zip -DestinationPath removal-engine
           New-Item -ItemType Directory -Force -Path bin | Out-Null
           Copy-Item removal-engine/GeminiWatermarkTool-Video.exe bin/GeminiWatermarkTool-Video.exe
+      - name: Bundle FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          FFmpeg_VERSION="8.1.2"
+          FFmpeg_COMMIT="38b88335f99e76ed89ff3c93f877fdefce736c13"
+          curl -fL --retry 3 "https://github.com/FFmpeg/FFmpeg/archive/${FFmpeg_COMMIT}.tar.gz" -o ffmpeg-source.tar.gz
+          mkdir -p ffmpeg-source ffmpeg-install bin
+          tar -xzf ffmpeg-source.tar.gz --strip-components=1 -C ffmpeg-source
+          cd ffmpeg-source
+          ./configure \
+            --prefix="$GITHUB_WORKSPACE/ffmpeg-install" \
+            --disable-debug --disable-doc --disable-ffplay \
+            --disable-shared --enable-static --disable-x86asm \
+            --disable-gpl --disable-nonfree \
+            --enable-videotoolbox --enable-audiotoolbox
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+          cd "$GITHUB_WORKSPACE"
+          cp ffmpeg-install/bin/ffmpeg bin/ffmpeg
+          cp ffmpeg-install/bin/ffprobe bin/ffprobe
+          chmod 755 bin/ffmpeg bin/ffprobe
+          curl -fL "https://raw.githubusercontent.com/FFmpeg/FFmpeg/${FFmpeg_COMMIT}/LICENSE.md" -o bin/FFMPEG-LICENSE.txt
+          printf 'FFmpeg %s\nSource commit: %s\nConfiguration: LGPL-only, no GPL/nonfree components.\n' "$FFmpeg_VERSION" "$FFmpeg_COMMIT" > bin/FFMPEG-SOURCE.txt
+          ! bin/ffmpeg -buildconf 2>&1 | grep -Eq -- '--enable-gpl|--enable-nonfree'
+      - name: Bundle FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-29-13-36/ffmpeg-n8.1.2-31-g8c9502e9b0-win64-lgpl-8.1.zip"
+          $expected = "dc1caf47ae4fbbf33dcd39d30e7c7af2c63d417e872f0e948b5d68ae5a106794"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          if ((Get-FileHash ffmpeg.zip -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw "FFmpeg checksum mismatch" }
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-unpacked
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          Copy-Item (Get-ChildItem ffmpeg-unpacked -Recurse -Filter ffmpeg.exe | Select-Object -First 1).FullName bin/ffmpeg.exe
+          Copy-Item (Get-ChildItem ffmpeg-unpacked -Recurse -Filter ffprobe.exe | Select-Object -First 1).FullName bin/ffprobe.exe
+          Copy-Item (Get-ChildItem ffmpeg-unpacked -Recurse -Filter LICENSE.txt | Select-Object -First 1).FullName bin/FFMPEG-LICENSE.txt
+          Set-Content -Path bin/FFMPEG-SOURCE.txt -Value "FFmpeg 8.1.2; BtbN LGPL build; source release autobuild-2026-07-29-13-36"
+          $config = (& bin/ffmpeg.exe -buildconf 2>&1 | Out-String)
+          if ($config -match '--enable-gpl|--enable-nonfree') { throw "GPL or nonfree FFmpeg configuration detected" }
       - name: Build app
         run: npm run tauri -- build ${{ matrix.bundle-args }}
       - name: Create macOS release files
@@ -115,7 +157,13 @@ jobs:
           SIGNING_IDENTITY="$(security find-identity -v -p codesigning | awk -F '\"' '/Developer ID Application/ { print $2; exit }')"
           test -n "$SIGNING_IDENTITY"
           test -f "$ENGINE"
+          for TOOL in ffmpeg ffprobe; do
+            test -f "$APP/Contents/Resources/bin/$TOOL"
+          done
           codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$ENGINE"
+          for TOOL in ffmpeg ffprobe; do
+            codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP/Contents/Resources/bin/$TOOL"
+          done
           codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/notary-upload.zip"
