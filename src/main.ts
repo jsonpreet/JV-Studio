@@ -2190,6 +2190,10 @@ queueElement.addEventListener("click", (event) => {
     }
     return;
   }
+  if (target.closest(".drop-zone")) {
+    void chooseVideos();
+    return;
+  }
   const row = target.closest<HTMLElement>("[data-job-id]");
   if (!row) return;
   const id = row.dataset.jobId;
