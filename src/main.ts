@@ -744,7 +744,7 @@ function renderHistory(): void {
               <article class="history-card">
                 <div class="history-thumb">${thumbnailMarkup(videoPath)}</div>
                 <div class="history-main">
-                  <strong>${escapeHtml(filename(videoPath))}</strong>
+                  <strong title="${escapeHtml(videoPath)}">${escapeHtml(filename(videoPath))}</strong>
                   <span>${operationLabel(item.operation)} · ${new Date(item.updatedAt).toLocaleString()}</span>
                   <small title="${escapeHtml(videoPath)}">${escapeHtml(videoPath)}</small>
                 </div>
